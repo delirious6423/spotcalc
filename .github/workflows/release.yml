@@ -1,0 +1,49 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the tarball and create a draft GitHub release with it.
+# Review the draft on GitHub, then publish it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    # Built on the oldest supported Ubuntu so the binary needs only glibc 2.35 and runs on
+    # Ubuntu 22.04+, Debian 12+, Fedora 36+ and newer.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-about
+
+      - name: Check tag matches Cargo.toml version
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          test "${GITHUB_REF_NAME}" = "v${version}" || { echo "Tag ${GITHUB_REF_NAME} != v${version}"; exit 1; }
+
+      - run: cargo test --locked
+      - run: scripts/package.sh
+
+      - name: Show required glibc
+        run: objdump -T dist/*/spotcalc | grep -oE 'GLIBC_[0-9.]+' | sort -uV | tail -1
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Release notes: this version's section of CHANGELOG.md.
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            /^## \[/ { if (found) exit; found = index($0, "[" v "]") > 0; next }
+            found' CHANGELOG.md > notes.md
+          gh release create "${GITHUB_REF_NAME}" --draft --title "spotcalc ${GITHUB_REF_NAME}" \
+            --notes-file notes.md dist/*.tar.gz dist/*.tar.gz.sha256

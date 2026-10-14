@@ -1,0 +1,18 @@
+# Config for cargo-about (https://github.com/EmbarkStudios/cargo-about), which collects the
+# licence texts of every compiled-in crate into THIRD_PARTY_LICENSES.txt for binary releases.
+# Keep in sync with the allow list in deny.toml.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "CDLA-Permissive-2.0",
+]
+targets = ["x86_64-unknown-linux-gnu"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true

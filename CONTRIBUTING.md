@@ -39,6 +39,19 @@ One test downloads real exchange rates and is skipped by default; run it with
 - If you change behaviour shown in the README, update the README (its examples are tested in
   `tests/readme_examples.rs`).
 
+## Releasing (maintainers)
+
+1. Update `version` in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows, and turn the
+   `Unreleased` heading in `CHANGELOG.md` into `## [x.y.z] - YYYY-MM-DD`.
+2. Commit, then tag and push: `git tag vx.y.z && git push origin main vx.y.z`.
+3. The Release workflow builds the tarball on Ubuntu 22.04 (for glibc 2.35 compatibility),
+   bundles all licence texts, and creates a **draft** release with notes from the changelog.
+4. Check the draft on GitHub and publish it.
+
+To build the same tarball locally (it will need your machine's newer glibc), install
+[cargo-about](https://github.com/EmbarkStudios/cargo-about) and run `scripts/package.sh`;
+output goes to `dist/`.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the
