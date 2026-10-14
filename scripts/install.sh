@@ -16,6 +16,9 @@ CUSTOM="$SCHEMA.custom-keybinding:$ENTRY"
 # GNOME binds <Alt>space to the window menu; a custom shortcut on the same key would never fire.
 WM=org.gnome.desktop.wm.keybindings
 LOCAL_BIN="$HOME/.local/bin/spotcalc"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+DESKTOP_FILE="$DATA/applications/spotcalc.desktop"
+ICON_FILE="$DATA/icons/hicolor/scalable/apps/spotcalc.svg"
 
 have_gnome() { gsettings list-schemas 2>/dev/null | grep -qx "$SCHEMA"; }
 
@@ -27,7 +30,7 @@ if [[ "$KEY" == "--uninstall" ]]; then
         gsettings reset-recursively "$CUSTOM"
         gsettings reset "$WM" activate-window-menu
     fi
-    rm -f "$LOCAL_BIN"
+    rm -f "$LOCAL_BIN" "$DESKTOP_FILE" "$ICON_FILE"
     if command -v cargo >/dev/null; then cargo uninstall spotcalc 2>/dev/null || true; fi
     echo "Removed spotcalc and its shortcut."
     echo "History and cached rates remain in ~/.local/share/spotcalc and ~/.cache/spotcalc."
@@ -37,11 +40,19 @@ fi
 if [[ -x "$HERE/spotcalc" ]]; then
     install -Dm755 "$HERE/spotcalc" "$LOCAL_BIN"
     BINARY="$LOCAL_BIN"
+    SHARE="$HERE/share"
 else
     cargo install --locked --path "$HERE/.."
     BINARY="$HOME/.cargo/bin/spotcalc"
+    SHARE="$HERE/../assets"
 fi
 echo "Installed $BINARY"
+
+# App-grid entry and icon. Exec gets the full path, since ~/.local/bin and ~/.cargo/bin
+# aren't always on the desktop session's PATH.
+install -Dm644 "$SHARE/spotcalc.svg" "$ICON_FILE"
+mkdir -p "$(dirname "$DESKTOP_FILE")"
+sed "s|^Exec=spotcalc$|Exec=$BINARY|" "$SHARE/spotcalc.desktop" > "$DESKTOP_FILE"
 
 if ! have_gnome; then
     echo "Not GNOME: bind a key in your desktop's settings to run $BINARY (see README.md)."

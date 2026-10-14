@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=spotcalc
+GenericName=Calculator
+Comment=Quick calculator popup with units and currencies
+Exec=spotcalc
+Icon=spotcalc
+Terminal=false
+Categories=Utility;Calculator;
+Keywords=calculator;calc;math;units;currency;convert;spotlight;
+StartupWMClass=spotcalc

@@ -44,13 +44,19 @@ One test downloads real exchange rates and is skipped by default; run it with
 1. Update `version` in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows, and turn the
    `Unreleased` heading in `CHANGELOG.md` into `## [x.y.z] - YYYY-MM-DD`.
 2. Commit, then tag and push: `git tag vx.y.z && git push origin main vx.y.z`.
-3. The Release workflow builds the tarball on Ubuntu 22.04 (for glibc 2.35 compatibility),
-   bundles all licence texts, and creates a **draft** release with notes from the changelog.
+3. The Release workflow builds the tar.gz and .deb on Ubuntu 22.04 (for glibc 2.35
+   compatibility), bundles all licence texts, and creates a **draft** release with notes from
+   the changelog.
 4. Check the draft on GitHub and publish it.
 
-To build the same tarball locally (it will need your machine's newer glibc), install
-[cargo-about](https://github.com/EmbarkStudios/cargo-about) and run `scripts/package.sh`;
-output goes to `dist/`.
+To build the same packages locally (they will need your machine's newer glibc), install
+[cargo-about](https://github.com/EmbarkStudios/cargo-about) and
+[cargo-deb](https://github.com/kornelski/cargo-deb), then run `scripts/package.sh`; output goes
+to `dist/`. Use the script rather than plain `cargo deb`: it generates the licence files the
+.deb includes.
+
+The hotkey setup has an end-to-end test that writes to a throwaway settings file only:
+`GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME=$(mktemp -d) cargo test --test gnome_hotkey -- --ignored`.
 
 ## License
 

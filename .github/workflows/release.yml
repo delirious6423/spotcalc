@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag like v0.1.0 to build the tarball and create a draft GitHub release with it.
+# Push a tag like v0.1.0 to build the tarball and .deb and create a draft GitHub release.
 # Review the draft on GitHub, then publish it.
 on:
   push:
@@ -15,7 +15,7 @@ env:
 jobs:
   release:
     # Built on the oldest supported Ubuntu so the binary needs only glibc 2.35 and runs on
-    # Ubuntu 22.04+, Debian 12+, Fedora 36+ and newer.
+    # Ubuntu 22.04+, Debian 12+, Fedora 36+ and newer (the .deb then depends on libc6 >= 2.35).
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,7 +24,7 @@ jobs:
           toolchain: stable
       - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
-          tool: cargo-about
+          tool: cargo-about,cargo-deb
 
       - name: Check tag matches Cargo.toml version
         run: |
@@ -35,7 +35,10 @@ jobs:
       - run: scripts/package.sh
 
       - name: Show required glibc
-        run: objdump -T dist/*/spotcalc | grep -oE 'GLIBC_[0-9.]+' | sort -uV | tail -1
+        run: objdump -T target/release/spotcalc | grep -oE 'GLIBC_[0-9.]+' | sort -uV | tail -1
+
+      - name: Show package info
+        run: dpkg-deb --info dist/*.deb
 
       - name: Create draft release
         env:
@@ -46,4 +49,4 @@ jobs:
             /^## \[/ { if (found) exit; found = index($0, "[" v "]") > 0; next }
             found' CHANGELOG.md > notes.md
           gh release create "${GITHUB_REF_NAME}" --draft --title "spotcalc ${GITHUB_REF_NAME}" \
-            --notes-file notes.md dist/*.tar.gz dist/*.tar.gz.sha256
+            --notes-file notes.md dist/*.tar.gz dist/*.deb dist/SHA256SUMS

@@ -15,4 +15,7 @@ First public release.
 - Enter copies the result; history with ↑/↓ and click-to-copy, saved across sessions.
 - Currency conversion with daily rates from exchange-api, cached for offline use.
 - GNOME install script that binds the hotkey (default Alt+Space).
+- Downloads: a .deb for double-click install on Ubuntu/Debian, and a tar.gz for any distro;
+  both include all third-party licence texts.
+- App-grid entry and icon; on first launch from GNOME, a banner offers to set up Alt+Space.
 - Fallback font so arrows and math symbols render on Debian/Ubuntu, Fedora and Arch.
