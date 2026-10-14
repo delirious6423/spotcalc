@@ -30,6 +30,21 @@ cargo deny check              # licences and advisories (https://github.com/Emba
 One test downloads real exchange rates and is skipped by default; run it with
 `cargo test -- --ignored`.
 
+### End-to-end test in a VM
+
+`tests/vm/run.sh` installs the real .deb in a throwaway Ubuntu 26.04 VM (QEMU/KVM) and drives the
+actual window in a headless Sway session: typing, clicks, clipboard, history, currency rates,
+toggle and focus handling, idle redraws, the hotkey banner, and uninstall. Nothing touches your
+desktop. It also regenerates the README screenshot (`target/vm-test/readme-screenshot.png`).
+
+```bash
+VM_DIR=/path/with/5GB/free tests/vm/run.sh
+```
+
+Needs `qemu-system-x86` and `qemu-utils`, access to `/dev/kvm`, and cargo-about + cargo-deb.
+The first run prepares a VM image with the test tools (about 3 minutes); later runs take 1–2
+minutes.
+
 ### Guidelines
 
 - Keep the window fast to open and idle when nothing changes: no continuous redraws, no network

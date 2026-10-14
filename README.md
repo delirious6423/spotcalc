@@ -1,5 +1,7 @@
 # spotcalc
 
+![spotcalc converting 70 kg to pounds as you type, with recent calculations listed below](docs/screenshot.png)
+
 A Spotlight-style calculator popup for Linux. Press a hotkey, type a calculation, read the answer
 as you type, press Enter to copy it. Press the hotkey again (or Esc) and it's gone.
 
