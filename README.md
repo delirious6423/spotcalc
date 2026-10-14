@@ -20,11 +20,11 @@ Clicking a history row copies its result. History: `~/.local/share/spotcalc/hist
 ## Install
 
 ```bash
-scripts/install.sh '<Super>c'
+scripts/install.sh '<Alt>space'
 ```
 
 Builds into `~/.cargo/bin/spotcalc` and adds a GNOME custom shortcut (visible in
-Settings → Keyboard → Custom Shortcuts). Undo with `scripts/install.sh --uninstall`.
+Settings → Keyboard → Custom Shortcuts). `<Alt>space` is taken off GNOME's window menu. Undo with `scripts/install.sh --uninstall`.
 
 ## How it works
 

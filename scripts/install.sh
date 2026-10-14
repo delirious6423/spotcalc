@@ -10,17 +10,25 @@ ENTRY="$BASE/spotcalc/"
 CUSTOM="$SCHEMA.custom-keybinding:$ENTRY"
 
 current=$(gsettings get "$SCHEMA" custom-keybindings)
+# GNOME binds <Alt>space to the window menu; a custom shortcut on the same key would never fire.
+WM=org.gnome.desktop.wm.keybindings
 
 if [[ "$KEY" == "--uninstall" ]]; then
     new=$(python3 -c "import ast,sys; l=ast.literal_eval(sys.argv[1].replace('@as ','')); print([x for x in l if x!=sys.argv[2]])" "$current" "$ENTRY")
     gsettings set "$SCHEMA" custom-keybindings "$new"
     gsettings reset-recursively "$CUSTOM"
+    gsettings reset "$WM" activate-window-menu
     cargo uninstall spotcalc || true
     echo "Removed the shortcut and the binary. History remains in ~/.local/share/spotcalc/."
     exit 0
 fi
 
 cargo install --locked --path "$(dirname "$0")/.."
+
+if [[ "$(gsettings get "$WM" activate-window-menu)" == *"'$KEY'"* ]]; then
+    gsettings set "$WM" activate-window-menu "[]"
+    echo "Freed $KEY from the window menu (right-click a title bar to open it)."
+fi
 
 if [[ "$current" != *"$ENTRY"* ]]; then
     new=$(python3 -c "import ast,sys; l=ast.literal_eval(sys.argv[1].replace('@as ','')); print(l+[sys.argv[2]])" "$current" "$ENTRY")
