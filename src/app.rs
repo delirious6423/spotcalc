@@ -12,6 +12,33 @@ use crate::history::History;
 /// Initial window size in logical pixels.
 pub const WINDOW_SIZE: [f32; 2] = [640.0, 380.0];
 
+/// egui's bundled fonts lack arrows and many math symbols (↑ √ ×), which then show as boxes.
+/// DejaVu Sans covers them and ships with Ubuntu and most other distros.
+const FALLBACK_FONT: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+
+/// Adds [`FALLBACK_FONT`] behind egui's own fonts; without it, text still renders minus those glyphs.
+fn install_fallback_font(ctx: &egui::Context) {
+    let bytes = match std::fs::read(FALLBACK_FONT) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::warn!("no fallback font at {FALLBACK_FONT}: {e}");
+            return;
+        }
+    };
+    let families = [egui::FontFamily::Proportional, egui::FontFamily::Monospace]
+        .into_iter()
+        .map(|family| egui::epaint::text::InsertFontFamily {
+            family,
+            priority: egui::epaint::text::FontPriority::Lowest,
+        })
+        .collect();
+    ctx.add_font(egui::epaint::text::FontInsert::new(
+        "DejaVuSans",
+        egui::FontData::from_owned(bytes),
+        families,
+    ));
+}
+
 /// Feedback below the input line.
 enum Status {
     None,
@@ -37,6 +64,7 @@ impl SpotCalc {
     /// Creates the app and starts listening for "close" toggles on `listener`.
     #[must_use]
     pub fn new(ctx: &egui::Context, history: History, listener: UnixListener) -> Self {
+        install_fallback_font(ctx);
         let close_requested = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&close_requested);
         let ctx = ctx.clone();
