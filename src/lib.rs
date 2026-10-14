@@ -4,3 +4,4 @@ pub mod app;
 pub mod calc;
 pub mod history;
 pub mod instance;
+pub mod rates;

@@ -3,6 +3,8 @@
 
 use std::time::{Duration, Instant};
 
+use crate::rates::SharedRates;
+
 /// How long a committed calculation may run before it is aborted.
 const COMMIT_LIMIT: Duration = Duration::from_secs(2);
 /// Live previews run on every keystroke, so they get a much tighter budget to keep typing smooth.
@@ -35,6 +37,14 @@ impl Calculator {
         Self {
             context: fend_core::Context::new(),
         }
+    }
+
+    /// Creates a calculator that converts currencies (`100 USD to TWD`) with `rates`.
+    #[must_use]
+    pub fn with_rates(rates: SharedRates) -> Self {
+        let mut calc = Self::new();
+        calc.context.set_exchange_rate_handler_v2(rates);
+        calc
     }
 
     /// Evaluates `input` without changing any state. Returns `None` while the input is
@@ -96,6 +106,29 @@ mod tests {
         assert_eq!(calc.preview("2 +"), None);
         assert_eq!(calc.preview("5"), None);
         assert_eq!(calc.preview(""), None);
+    }
+
+    fn sample_rates() -> SharedRates {
+        let json = r#"{"date":"2026-10-13","usd":{"usd":1,"twd":32,"eur":0.5}}"#;
+        SharedRates::with(crate::rates::Rates::parse(json).expect("sample"))
+    }
+
+    #[test]
+    fn converts_currency() {
+        let mut calc = Calculator::with_rates(sample_rates());
+        assert_eq!(calc.evaluate("10 USD to TWD").as_deref(), Ok("320 TWD"));
+        assert_eq!(calc.evaluate("1 EUR to TWD").as_deref(), Ok("64 TWD"));
+        assert_eq!(calc.preview("2 EUR in USD").as_deref(), Some("4 USD"));
+    }
+
+    #[test]
+    fn currency_errors_without_rates() {
+        let mut calc = Calculator::with_rates(SharedRates::default());
+        assert!(calc.evaluate("10 USD to TWD").is_err());
+        assert!(
+            calc.evaluate("1 + 1").is_ok(),
+            "non-currency math unaffected"
+        );
     }
 
     #[test]

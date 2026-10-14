@@ -110,6 +110,8 @@ exceptions = [
     # egui's bundled fonts (Ubuntu-Light, Hack, emoji); fonts only, not linked code.
     { allow = ["OFL-1.1", "Ubuntu-font-1.0"], crate = "epaint_default_fonts" },
     { allow = ["OFL-1.1", "Ubuntu-font-1.0"], crate = "epaint" },
+    # Mozilla's trusted HTTPS root certificates, bundled as data (permissive data licence).
+    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
     # Each entry is the crate and version constraint, and its specific allow
     # list
     #{ allow = ["Zlib"], crate = "adler32" },

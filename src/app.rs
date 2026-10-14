@@ -1,6 +1,7 @@
 //! The launcher window: one input line, a live result, and history.
 
 use std::os::unix::net::UnixListener;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -8,6 +9,7 @@ use eframe::egui::{self, FontId, Key, Modifiers, RichText};
 
 use crate::calc::Calculator;
 use crate::history::History;
+use crate::rates;
 
 /// Initial window size in logical pixels.
 pub const WINDOW_SIZE: [f32; 2] = [640.0, 380.0];
@@ -61,10 +63,19 @@ pub struct SpotCalc {
 }
 
 impl SpotCalc {
-    /// Creates the app and starts listening for "close" toggles on `listener`.
+    /// Creates the app, starts listening for "close" toggles on `listener`, and loads
+    /// exchange rates from `rates_cache` (refreshing them in the background if stale).
     #[must_use]
-    pub fn new(ctx: &egui::Context, history: History, listener: UnixListener) -> Self {
+    pub fn new(
+        ctx: &egui::Context,
+        history: History,
+        listener: UnixListener,
+        rates_cache: PathBuf,
+    ) -> Self {
         install_fallback_font(ctx);
+        // Redraw when fresh rates arrive so a currency preview fills in by itself.
+        let repaint_ctx = ctx.clone();
+        let rates = rates::start(rates_cache, move || repaint_ctx.request_repaint());
         let close_requested = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&close_requested);
         let ctx = ctx.clone();
@@ -78,7 +89,7 @@ impl SpotCalc {
         });
         Self {
             input: String::new(),
-            calc: Calculator::new(),
+            calc: Calculator::with_rates(rates),
             history,
             status: Status::None,
             browsing: None,
