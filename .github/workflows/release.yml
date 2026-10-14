@@ -47,6 +47,7 @@ jobs:
           # Release notes: this version's section of CHANGELOG.md.
           awk -v v="${GITHUB_REF_NAME#v}" '
             /^## \[/ { if (found) exit; found = index($0, "[" v "]") > 0; next }
+            /^\[[^]]+\]: / { next }
             found' CHANGELOG.md > notes.md
           gh release create "${GITHUB_REF_NAME}" --draft --title "spotcalc ${GITHUB_REF_NAME}" \
             --notes-file notes.md dist/*.tar.gz dist/*.deb dist/SHA256SUMS
