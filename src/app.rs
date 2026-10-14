@@ -41,6 +41,37 @@ fn install_fallback_font(ctx: &egui::Context) {
     ));
 }
 
+/// Drops the empty IME preedit events IBus sends whenever egui reports the text cursor position.
+///
+/// egui-winit re-sends the cursor position on every frame that had any input event, and IBus
+/// answers each time with an empty preedit, which is itself an input event: an endless ~75 fps
+/// redraw loop while idle. An empty preedit only matters when it ends a composition in
+/// progress (e.g. a cancelled Chinese input), so those are kept.
+#[derive(Debug, Default)]
+struct ImeFilter {
+    composing: bool,
+}
+
+impl ImeFilter {
+    /// Whether `event` should reach egui.
+    fn keep(&mut self, event: &egui::Event) -> bool {
+        match event {
+            egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) if text.is_empty() => {
+                std::mem::take(&mut self.composing)
+            }
+            egui::Event::Ime(egui::ImeEvent::Preedit { .. }) => {
+                self.composing = true;
+                true
+            }
+            egui::Event::Ime(egui::ImeEvent::Commit(_)) => {
+                self.composing = false;
+                true
+            }
+            _ => true,
+        }
+    }
+}
+
 /// Feedback below the input line.
 enum Status {
     None,
@@ -60,6 +91,7 @@ pub struct SpotCalc {
     close_requested: Arc<AtomicBool>,
     /// Only close on focus loss after the window has actually had focus once.
     had_focus: bool,
+    ime_filter: ImeFilter,
 }
 
 impl SpotCalc {
@@ -73,6 +105,9 @@ impl SpotCalc {
         rates_cache: PathBuf,
     ) -> Self {
         install_fallback_font(ctx);
+        // A blinking cursor redraws the window several times a second; a steady one lets the
+        // window sit idle with no redraws at all.
+        ctx.all_styles_mut(|style| style.visuals.text_cursor.blink = false);
         // Redraw when fresh rates arrive so a currency preview fills in by itself.
         let repaint_ctx = ctx.clone();
         let rates = rates::start(rates_cache, move || repaint_ctx.request_repaint());
@@ -95,6 +130,7 @@ impl SpotCalc {
             browsing: None,
             close_requested,
             had_focus: false,
+            ime_filter: ImeFilter::default(),
         }
     }
 
@@ -143,6 +179,10 @@ impl SpotCalc {
 }
 
 impl eframe::App for SpotCalc {
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        raw_input.events.retain(|event| self.ime_filter.keep(event));
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let focused = ctx.input(|i| i.viewport().focused);
         if focused == Some(true) {
@@ -156,6 +196,7 @@ impl eframe::App for SpotCalc {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        tracing::trace!("frame");
         let ctx = ui.ctx().clone();
         // Consume these before the text field sees them, so ↑/↓ don't move the cursor
         // and Enter doesn't drop focus.
@@ -184,7 +225,11 @@ impl eframe::App for SpotCalc {
                 .desired_width(f32::INFINITY)
                 .frame(egui::Frame::NONE);
             let response = ui.add(edit);
-            response.request_focus();
+            // Only when needed: each request_focus also resets the input method, which makes
+            // IBus send an event and so triggers another frame.
+            if !response.has_focus() {
+                response.request_focus();
+            }
             if response.changed() {
                 self.status = Status::None;
                 self.browsing = None;
@@ -246,5 +291,47 @@ impl eframe::App for SpotCalc {
 
     fn clear_color(&self, visuals: &egui::Visuals) -> [f32; 4] {
         visuals.panel_fill.to_normalized_gamma_f32()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn preedit(text: &str) -> egui::Event {
+        egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: text.to_owned(),
+            active_range_chars: None,
+        })
+    }
+
+    #[test]
+    fn idle_empty_preedits_are_dropped() {
+        let mut filter = ImeFilter::default();
+        assert!(!filter.keep(&preedit("")));
+        assert!(!filter.keep(&preedit("")));
+        assert!(filter.keep(&egui::Event::Text("1".to_owned())));
+    }
+
+    #[test]
+    fn composition_events_pass_through() {
+        let mut filter = ImeFilter::default();
+        assert!(filter.keep(&preedit("ㄋㄧˇ")));
+        assert!(filter.keep(&egui::Event::Ime(egui::ImeEvent::Commit("你".to_owned()))));
+        assert!(
+            !filter.keep(&preedit("")),
+            "nothing left to clear after commit"
+        );
+    }
+
+    #[test]
+    fn cancelling_a_composition_clears_it() {
+        let mut filter = ImeFilter::default();
+        assert!(filter.keep(&preedit("ㄋ")));
+        assert!(
+            filter.keep(&preedit("")),
+            "empty preedit ends the composition"
+        );
+        assert!(!filter.keep(&preedit("")));
     }
 }
