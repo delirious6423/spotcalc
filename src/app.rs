@@ -15,17 +15,23 @@ use crate::rates;
 pub const WINDOW_SIZE: [f32; 2] = [640.0, 380.0];
 
 /// egui's bundled fonts lack arrows and many math symbols (↑ √ ×), which then show as boxes.
-/// DejaVu Sans covers them and ships with Ubuntu and most other distros.
-const FALLBACK_FONT: &str = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+/// DejaVu Sans covers them and ships with nearly every distro, at one of these paths
+/// (Debian/Ubuntu, Fedora, Arch/openSUSE).
+const FALLBACK_FONTS: [&str; 3] = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+];
 
-/// Adds [`FALLBACK_FONT`] behind egui's own fonts; without it, text still renders minus those glyphs.
+/// Adds the first of [`FALLBACK_FONTS`] found behind egui's own fonts; without one, text still
+/// renders minus those glyphs.
 fn install_fallback_font(ctx: &egui::Context) {
-    let bytes = match std::fs::read(FALLBACK_FONT) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            tracing::warn!("no fallback font at {FALLBACK_FONT}: {e}");
-            return;
-        }
+    let Some(bytes) = FALLBACK_FONTS
+        .iter()
+        .find_map(|path| std::fs::read(path).ok())
+    else {
+        tracing::warn!("no DejaVu Sans found; some symbols will show as boxes");
+        return;
     };
     let families = [egui::FontFamily::Proportional, egui::FontFamily::Monospace]
         .into_iter()
