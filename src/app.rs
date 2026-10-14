@@ -4,11 +4,16 @@ use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
+
+use anyhow::Context as _;
 
 use eframe::egui::{self, FontId, Key, Modifiers, RichText};
 
 use crate::calc::Calculator;
 use crate::history::History;
+use crate::hotkey;
+use crate::paths::Paths;
 use crate::rates;
 
 /// Initial window size in logical pixels.
@@ -78,6 +83,39 @@ impl ImeFilter {
     }
 }
 
+/// Checks the hotkey on a background thread (a few `gsettings` calls) unless the user dismissed
+/// the offer before or this is a development build.
+fn start_hotkey_check(
+    ctx: &egui::Context,
+    dismissed: &std::path::Path,
+) -> Option<mpsc::Receiver<hotkey::Status>> {
+    let installed = std::env::current_exe().is_ok_and(|exe| hotkey::is_installed_binary(&exe));
+    if dismissed.exists() || !installed {
+        return None;
+    }
+    let (tx, rx) = mpsc::channel();
+    let ctx = ctx.clone();
+    std::thread::spawn(move || {
+        let status = hotkey::status();
+        tracing::debug!(?status, "hotkey check");
+        if tx.send(status).is_ok() {
+            ctx.request_repaint();
+        }
+    });
+    Some(rx)
+}
+
+/// First-launch offer to set up the GNOME hotkey (for installs without `install.sh`).
+enum HotkeyBanner {
+    /// Not shown: already bound, dismissed, not GNOME, or still checking.
+    Hidden,
+    Offer {
+        replaces_window_menu: bool,
+    },
+    Done(String),
+    Failed(String),
+}
+
 /// Feedback below the input line.
 enum Status {
     None,
@@ -98,17 +136,22 @@ pub struct SpotCalc {
     /// Only close on focus loss after the window has actually had focus once.
     had_focus: bool,
     ime_filter: ImeFilter,
+    banner: HotkeyBanner,
+    /// Delivers the background hotkey check's result, once.
+    hotkey_check: Option<mpsc::Receiver<hotkey::Status>>,
+    hotkey_prompt_dismissed: PathBuf,
 }
 
 impl SpotCalc {
-    /// Creates the app, starts listening for "close" toggles on `listener`, and loads
-    /// exchange rates from `rates_cache` (refreshing them in the background if stale).
+    /// Creates the app, starts listening for "close" toggles on `listener`, loads exchange
+    /// rates (refreshing them in the background if stale), and checks in the background
+    /// whether to offer hotkey setup.
     #[must_use]
     pub fn new(
         ctx: &egui::Context,
         history: History,
         listener: UnixListener,
-        rates_cache: PathBuf,
+        paths: Paths,
     ) -> Self {
         install_fallback_font(ctx);
         // A blinking cursor redraws the window several times a second; a steady one lets the
@@ -116,7 +159,8 @@ impl SpotCalc {
         ctx.all_styles_mut(|style| style.visuals.text_cursor.blink = false);
         // Redraw when fresh rates arrive so a currency preview fills in by itself.
         let repaint_ctx = ctx.clone();
-        let rates = rates::start(rates_cache, move || repaint_ctx.request_repaint());
+        let rates = rates::start(paths.rates_cache, move || repaint_ctx.request_repaint());
+        let hotkey_check = start_hotkey_check(ctx, &paths.hotkey_prompt_dismissed);
         let close_requested = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&close_requested);
         let ctx = ctx.clone();
@@ -137,7 +181,87 @@ impl SpotCalc {
             close_requested,
             had_focus: false,
             ime_filter: ImeFilter::default(),
+            banner: HotkeyBanner::Hidden,
+            hotkey_check,
+            hotkey_prompt_dismissed: paths.hotkey_prompt_dismissed,
         }
+    }
+
+    fn set_up_hotkey(&mut self) {
+        let result = std::env::current_exe()
+            .context("locating the spotcalc binary")
+            .and_then(|exe| hotkey::bind(hotkey::DEFAULT_KEY, &exe));
+        self.banner = match result {
+            Ok(()) => HotkeyBanner::Done(hotkey::display_name(hotkey::DEFAULT_KEY)),
+            Err(e) => HotkeyBanner::Failed(format!("{e:#}")),
+        };
+    }
+
+    fn dismiss_hotkey_prompt(&mut self) {
+        let path = &self.hotkey_prompt_dismissed;
+        let saved = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(path, ""));
+        if let Err(e) = saved {
+            tracing::warn!("could not remember hotkey prompt dismissal: {e}");
+        }
+        self.banner = HotkeyBanner::Hidden;
+    }
+
+    fn show_hotkey_banner(&mut self, ui: &mut egui::Ui) {
+        if let Some(status) = self.hotkey_check.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.hotkey_check = None;
+            if let hotkey::Status::Unbound {
+                replaces_window_menu,
+            } = status
+            {
+                self.banner = HotkeyBanner::Offer {
+                    replaces_window_menu,
+                };
+            }
+        }
+        let key = hotkey::display_name(hotkey::DEFAULT_KEY);
+        let weak = ui.visuals().weak_text_color();
+        match &self.banner {
+            HotkeyBanner::Hidden => return,
+            HotkeyBanner::Offer {
+                replaces_window_menu,
+            } => {
+                let replaces_window_menu = *replaces_window_menu;
+                ui.horizontal(|ui| {
+                    ui.label(format!("Open spotcalc anytime with {key}?"));
+                    if ui.button("Set up").clicked() {
+                        self.set_up_hotkey();
+                    }
+                    if ui.button("Not now").clicked() {
+                        self.dismiss_hotkey_prompt();
+                    }
+                });
+                if replaces_window_menu {
+                    ui.label(
+                        RichText::new(format!(
+                            "This takes {key} from GNOME's window menu, which right-clicking a \
+                             title bar still opens."
+                        ))
+                        .small()
+                        .color(weak),
+                    );
+                }
+            }
+            HotkeyBanner::Done(key) => {
+                ui.label(format!("Done: press {key} to open or close spotcalc."));
+            }
+            HotkeyBanner::Failed(e) => {
+                ui.label(RichText::new(e).color(ui.visuals().error_fg_color));
+                ui.label(
+                    RichText::new("You can add a shortcut in Settings → Keyboard instead.")
+                        .small()
+                        .color(weak),
+                );
+            }
+        }
+        ui.separator();
     }
 
     fn commit(&mut self, ctx: &egui::Context) {
@@ -225,6 +349,7 @@ impl eframe::App for SpotCalc {
             .inner_margin(16.0)
             .stroke(ui.visuals().widgets.noninteractive.bg_stroke);
         egui::CentralPanel::default().frame(frame).show(ui, |ui| {
+            self.show_hotkey_banner(ui);
             let edit = egui::TextEdit::singleline(&mut self.input)
                 .font(FontId::proportional(28.0))
                 .hint_text("Calculate…  e.g. 15% of 80, 3 ft to cm, 0xff to decimal")

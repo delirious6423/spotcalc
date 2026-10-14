@@ -1,23 +1,9 @@
-use std::path::PathBuf;
-
 use anyhow::Context as _;
 use eframe::egui;
 use spotcalc::app::{SpotCalc, WINDOW_SIZE};
 use spotcalc::history::History;
 use spotcalc::instance::{self, Instance};
-
-/// `$<var>/spotcalc`, or `~/<fallback>/spotcalc` when the XDG variable is unset or not
-/// absolute, as the XDG base-directory spec says.
-fn xdg_dir(var: &str, fallback: &str) -> anyhow::Result<PathBuf> {
-    let base = match std::env::var_os(var).map(PathBuf::from) {
-        Some(dir) if dir.is_absolute() => dir,
-        _ => {
-            let home = std::env::var_os("HOME").context("HOME is not set")?;
-            PathBuf::from(home).join(fallback)
-        }
-    };
-    Ok(base.join("spotcalc"))
-}
+use spotcalc::paths::Paths;
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -31,9 +17,8 @@ fn main() -> anyhow::Result<()> {
             Instance::Primary(listener) => listener,
         };
 
-    let history_path = xdg_dir("XDG_DATA_HOME", ".local/share")?.join("history.tsv");
-    let rates_cache = xdg_dir("XDG_CACHE_HOME", ".cache")?.join("rates.json");
-    let history = History::load(&history_path).unwrap_or_else(|e| {
+    let paths = Paths::from_env()?;
+    let history = History::load(&paths.history).unwrap_or_else(|e| {
         tracing::warn!("starting with empty history: {e:#}");
         History::default()
     });
@@ -58,7 +43,7 @@ fn main() -> anyhow::Result<()> {
                 &cc.egui_ctx,
                 history,
                 listener,
-                rates_cache,
+                paths,
             )))
         }),
     )

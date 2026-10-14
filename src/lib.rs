@@ -3,5 +3,7 @@
 pub mod app;
 pub mod calc;
 pub mod history;
+pub mod hotkey;
 pub mod instance;
+pub mod paths;
 pub mod rates;
