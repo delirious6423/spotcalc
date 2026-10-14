@@ -34,6 +34,13 @@ scripts/install.sh '<Alt>space'
 Builds into `~/.cargo/bin/spotcalc` and adds a GNOME custom shortcut (visible in
 Settings → Keyboard → Custom Shortcuts). `<Alt>space` is taken off GNOME's window menu. Undo with `scripts/install.sh --uninstall`.
 
+## Performance
+
+Opens in ~100 ms (almost all of it OpenGL and window setup; spotcalc's own startup is under
+2 ms) and uses no CPU while open and idle: it only redraws on input. On machines whose only GPU
+is NVIDIA, the install script makes the shortcut load only NVIDIA's EGL driver, which skips
+Mesa's LLVM and cuts memory from ~120 MB to ~69 MB.
+
 ## How it works
 
 Wayland doesn't let apps grab global hotkeys, so the GNOME shortcut simply runs `spotcalc`. The
