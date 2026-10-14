@@ -2,6 +2,13 @@
 name = "spotcalc"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.92"
+description = "Spotlight-style calculator popup for Linux: hotkey, type, Enter copies the result"
+license = "Apache-2.0"
+repository = "https://github.com/delirious6423/spotcalc"
+readme = "README.md"
+keywords = ["calculator", "launcher", "spotlight", "gnome", "units"]
+categories = ["gui", "mathematics"]
 publish = false
 
 [dependencies]

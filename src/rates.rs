@@ -2,7 +2,7 @@
 //! (<https://github.com/fawazahmed0/exchange-api>), cached on disk.
 //!
 //! Rates are loaded from the cache at startup and refreshed in a background thread when the
-//! cache is older than [`MAX_AGE`], so opening the window never waits on the network and
+//! cache is older than 12 hours, so opening the window never waits on the network and
 //! conversions keep working offline with the last downloaded rates.
 
 use std::collections::HashMap;

@@ -1,0 +1,18 @@
+# Changelog
+
+All notable changes are listed here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/).
+
+## [0.1.0] - Unreleased
+
+First public release.
+
+### Added
+
+- Hotkey-toggled calculator popup with live results, powered by fend: arithmetic, units,
+  percentages, number bases, variables and `ans`.
+- Enter copies the result; history with ↑/↓ and click-to-copy, saved across sessions.
+- Currency conversion with daily rates from exchange-api, cached for offline use.
+- GNOME install script that binds the hotkey (default Alt+Space).
+- Fallback font so arrows and math symbols render on Debian/Ubuntu, Fedora and Arch.
