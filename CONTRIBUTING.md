@@ -41,9 +41,13 @@ desktop. It also regenerates the README screenshot (`target/vm-test/readme-scree
 VM_DIR=/path/with/5GB/free tests/vm/run.sh
 ```
 
-Needs `qemu-system-x86` and `qemu-utils`, access to `/dev/kvm`, and cargo-about + cargo-deb.
-The first run prepares a VM image with the test tools (about 3 minutes); later runs take 1–2
-minutes.
+Needs `qemu-system-x86` and `qemu-utils`, access to `/dev/kvm`, a systemd user session, and
+cargo-about + cargo-deb. The VM comes from [throwvm](https://github.com/delirious6423/throwvm),
+which `tests/vm/throwvm-pin.sh` downloads at a pinned version and checks against a pinned sha256
+(`THROWVM=/path/to/throwvm.py` uses a local copy). The first run saves two snapshots in `VM_DIR`,
+one after Ubuntu's first boot and one with the test tools from `tests/vm/provision.sh` (about a
+minute); later runs resume the VM in about a second, and the checks take about 30 seconds. The
+tools snapshot is made again when `provision.sh` changes or after 7 days.
 
 ### Guidelines
 
