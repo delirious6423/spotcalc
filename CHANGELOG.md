@@ -4,6 +4,20 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-10-15
+
+### Fixed
+
+- spotcalc failed to start after a switch from NVIDIA-only to hybrid graphics (for example
+  after a BIOS update): the hotkey forced NVIDIA's graphics driver, chosen when the hotkey was
+  set up. spotcalc now picks the driver each time it starts, and shortcuts made by 0.1.0 work
+  unchanged.
+
+### Security
+
+- Updated rustls to 0.23.46 (RUSTSEC-2026-0346, -0347, -0348, -0349). spotcalc uses it only
+  to download exchange rates.
+
 ## [0.1.0] - 2026-10-14
 
 First public release.
@@ -20,4 +34,5 @@ First public release.
 - App-grid entry and icon; on first launch from GNOME, a banner offers to set up Alt+Space.
 - Fallback font so arrows and math symbols render on Debian/Ubuntu, Fedora and Arch.
 
+[0.1.1]: https://github.com/delirious6423/spotcalc/releases/tag/v0.1.1
 [0.1.0]: https://github.com/delirious6423/spotcalc/releases/tag/v0.1.0
