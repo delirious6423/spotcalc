@@ -89,9 +89,7 @@ it is open closes it, so a hotkey that runs it toggles the window.
 
 Both the **Set up** button and `install.sh` add a custom keyboard shortcut, shown afterwards in
 Settings → Keyboard → Custom Shortcuts. GNOME uses Alt+Space for the window menu, so they take
-that key off the window menu (you can still right-click a title bar). On machines whose only GPU
-is NVIDIA, the shortcut also skips loading Mesa's graphics driver, which saves about 50 MB of
-memory. If you click **Not now**, the banner doesn't come back; use `install.sh` or Settings to
+that key off the window menu (you can still right-click a title bar). If you click **Not now**, the banner doesn't come back; use `install.sh` or Settings to
 add the shortcut later.
 
 ### Other desktops

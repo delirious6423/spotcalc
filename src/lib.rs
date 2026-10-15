@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod calc;
+pub mod gpu;
 pub mod history;
 pub mod hotkey;
 pub mod instance;

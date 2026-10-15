@@ -18,7 +18,6 @@ const ENTRY: &str = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybin
 const WM_KEYS: &str = "org.gnome.desktop.wm.keybindings";
 /// GNOME binds Alt+Space to this; a custom shortcut on the same key would never fire.
 const WINDOW_MENU: &str = "activate-window-menu";
-const NVIDIA_EGL: &str = "/usr/share/glvnd/egl_vendor.d/10_nvidia.json";
 
 /// Whether spotcalc can be opened with a hotkey.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,7 +94,8 @@ pub fn bind(key: &str, exe: &Path) -> anyhow::Result<()> {
         ])?;
     }
     let schema = custom_schema(ENTRY);
-    let command = shortcut_command(exe, nvidia_only());
+    // The app picks its GPU driver itself at launch (see `gpu`), so the command is just the binary.
+    let command = exe.display().to_string();
     gsettings(&["set", &schema, "name", &format_str("spotcalc")])?;
     gsettings(&["set", &schema, "command", &format_str(&command)])?;
     gsettings(&["set", &schema, "binding", &format_str(key)])?;
@@ -127,32 +127,6 @@ pub fn is_installed_binary(exe: &Path) -> bool {
     !parts
         .windows(2)
         .any(|w| w[0] == "target" && (w[1] == "debug" || w[1] == "release"))
-}
-
-/// The command the shortcut runs. On NVIDIA-only machines it skips loading Mesa's EGL driver,
-/// which pulls in ~45 MB of LLVM (see the README's Performance section).
-fn shortcut_command(exe: &Path, nvidia_only: bool) -> String {
-    let exe = exe.display();
-    if nvidia_only {
-        format!("env __EGL_VENDOR_LIBRARY_FILENAMES={NVIDIA_EGL} {exe}")
-    } else {
-        exe.to_string()
-    }
-}
-
-/// True when NVIDIA's EGL driver is installed and every GPU is NVIDIA (PCI vendor 0x10de).
-fn nvidia_only() -> bool {
-    if !Path::new(NVIDIA_EGL).exists() {
-        return false;
-    }
-    let vendors: Vec<String> = std::fs::read_dir("/sys/class/drm")
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|card| std::fs::read_to_string(card.path().join("device/vendor")).ok())
-        .map(|v| v.trim().to_owned())
-        .collect();
-    !vendors.is_empty() && vendors.iter().all(|v| v == "0x10de")
 }
 
 fn custom_schema(entry: &str) -> String {
@@ -246,15 +220,5 @@ mod tests {
         assert!(!is_installed_binary(Path::new(
             "/x/target/release/spotcalc"
         )));
-    }
-
-    #[test]
-    fn command_skips_mesa_only_on_nvidia_only_machines() {
-        let exe = Path::new("/usr/bin/spotcalc");
-        assert_eq!(shortcut_command(exe, false), "/usr/bin/spotcalc");
-        assert_eq!(
-            shortcut_command(exe, true),
-            format!("env __EGL_VENDOR_LIBRARY_FILENAMES={NVIDIA_EGL} /usr/bin/spotcalc")
-        );
     }
 }

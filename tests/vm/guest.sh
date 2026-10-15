@@ -188,6 +188,12 @@ check "toggle socket cleaned up" test ! -e "$XDG_RUNTIME_DIR/spotcalc.sock"
 start esc; wait_window; key Escape
 check "Esc closes" wait_gone
 
+# A shortcut made while NVIDIA was the only GPU forces NVIDIA's EGL driver; after a switch to
+# other graphics (here: none) spotcalc must drop it rather than fail to start.
+start stale-egl env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+check "opens despite a stale forced NVIDIA driver" wait_window
+key Escape; wait_gone
+
 # Focus moves to a second (empty) output, so the window stays visible. Moving to another workspace instead
 # would hide it, and Sway then sends no frame callbacks, so the app doesn't get to react until shown again.
 swaymsg -q create_output

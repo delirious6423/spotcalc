@@ -1,6 +1,9 @@
+use std::os::unix::process::CommandExt as _;
+
 use anyhow::Context as _;
 use eframe::egui;
 use spotcalc::app::{SpotCalc, WINDOW_SIZE};
+use spotcalc::gpu::{self, EglChoice};
 use spotcalc::history::History;
 use spotcalc::instance::{self, Instance};
 use spotcalc::paths::Paths;
@@ -9,6 +12,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    pick_egl_driver();
 
     let listener =
         match instance::acquire(&instance::socket_path()).context("single-instance socket")? {
@@ -51,4 +55,28 @@ fn main() -> anyhow::Result<()> {
 
     std::fs::remove_file(instance::socket_path()).ok();
     Ok(())
+}
+
+/// Restarts spotcalc with the EGL driver that fits the GPUs present now (see [`gpu`]). glvnd
+/// reads the variable when OpenGL loads, and changing our own environment needs `unsafe`, so
+/// this re-executes the binary instead (about 1 ms). Falls through if that fails.
+fn pick_egl_driver() {
+    let current = std::env::var_os(gpu::EGL_VENDOR_VAR);
+    let choice = gpu::choose(
+        current.as_deref(),
+        gpu::nvidia_only(std::path::Path::new("/sys/class/drm")),
+    );
+    let mut cmd = match std::env::current_exe() {
+        Ok(exe) => std::process::Command::new(exe),
+        Err(e) => return tracing::warn!("can't find own binary to pick EGL driver: {e}"),
+    };
+    cmd.args(std::env::args_os().skip(1));
+    match choice {
+        EglChoice::Keep => return,
+        EglChoice::NvidiaOnly => cmd.env(gpu::EGL_VENDOR_VAR, gpu::NVIDIA_EGL),
+        EglChoice::Default => cmd.env_remove(gpu::EGL_VENDOR_VAR),
+    };
+    tracing::debug!("restarting with EGL choice {choice:?}");
+    let e = cmd.exec(); // only returns on failure
+    tracing::warn!("restart for EGL choice {choice:?} failed: {e}");
 }
